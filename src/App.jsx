@@ -10,18 +10,29 @@ export default function App() {
   const [error, setError] = useState('');
   const [userName, setUserName] = useState('');
   const [leaderboard, setLeaderboard] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [submitError, setSubmitError] = useState('');
   const [hasRegistered, setHasRegistered] = useState(false);
 
+  // Cargar leaderboard al iniciar sesión
   useEffect(() => {
     if (isAuthenticated) {
       loadLeaderboard();
     }
   }, [isAuthenticated]);
 
+  // 🔁 Polling cada 3 segundos
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      loadLeaderboard();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  // Función para cargar leaderboard
   const loadLeaderboard = async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('Registros')
@@ -29,13 +40,9 @@ export default function App() {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-
       setLeaderboard(data || []);
     } catch (error) {
       console.error('Error loading leaderboard:', error);
-      setLeaderboard([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -59,9 +66,8 @@ export default function App() {
       return;
     }
 
-    // Verificar si el nombre ya existe
     const existingUser = leaderboard.find(
-      entry => entry.name.toLowerCase() === userName.trim().toLowerCase()
+      (entry) => entry.name.toLowerCase() === userName.trim().toLowerCase()
     );
 
     if (existingUser) {
@@ -72,18 +78,14 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('Registros')
-        .insert([
-          { name: userName.trim() }
-        ])
+        .insert([{ name: userName.trim() }])
         .select();
 
       if (error) throw error;
 
-      // Agregar el nuevo registro al leaderboard
       setLeaderboard([...leaderboard, data[0]]);
       setUserName('');
       setHasRegistered(true);
-      
       setTimeout(() => setHasRegistered(false), 3000);
     } catch (error) {
       setSubmitError('Error al guardar. Por favor intenta de nuevo.');
@@ -98,6 +100,7 @@ export default function App() {
     setLeaderboard([]);
   };
 
+  // Pantalla de login
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black flex items-center justify-center p-4">
@@ -112,9 +115,7 @@ export default function App() {
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-purple-200 mb-3">
-                Contraseña
-              </label>
+              <label className="block text-sm font-medium text-purple-200 mb-3">Contraseña</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-purple-400 w-5 h-5" />
                 <input
@@ -146,6 +147,7 @@ export default function App() {
     );
   }
 
+  // Pantalla principal
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black p-4">
       <div className="max-w-6xl mx-auto">
@@ -173,6 +175,7 @@ export default function App() {
 
           <div className="p-8">
             <div className="grid md:grid-cols-2 gap-8">
+              {/* Registro */}
               <div className="bg-gradient-to-br from-purple-900 to-gray-900 rounded-2xl p-8 border-2 border-purple-500 border-opacity-30 shadow-xl">
                 <div className="flex items-center gap-3 mb-8">
                   <div style={{ backgroundColor: '#7145d6' }} className="p-3 rounded-xl shadow-lg">
@@ -225,6 +228,7 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Leaderboard */}
               <div>
                 <div className="flex items-center gap-3 mb-8">
                   <div style={{ backgroundColor: '#7145d6' }} className="p-3 rounded-xl shadow-lg">
@@ -233,12 +237,7 @@ export default function App() {
                   <h2 className="text-3xl font-bold text-purple-100">Lista de Usuarios</h2>
                 </div>
 
-                {loading ? (
-                  <div className="text-center py-16 bg-gray-900 bg-opacity-40 rounded-2xl border border-purple-500 border-opacity-20">
-                    <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-600 border-t-purple-400"></div>
-                    <p className="mt-6 text-purple-300 text-lg">Cargando usuarios...</p>
-                  </div>
-                ) : leaderboard.length === 0 ? (
+                {leaderboard.length === 0 ? (
                   <div className="text-center py-16 bg-gray-900 bg-opacity-40 rounded-2xl border border-purple-500 border-opacity-20">
                     <Trophy className="w-20 h-20 text-purple-600 mx-auto mb-6 opacity-50" />
                     <p className="text-purple-300 text-xl font-semibold">No hay usuarios registrados</p>
@@ -271,9 +270,7 @@ export default function App() {
                             </p>
                           </div>
                         </div>
-                        {index === 0 && (
-                          <Crown className="w-8 h-8 text-yellow-400" />
-                        )}
+                        {index === 0 && <Crown className="w-8 h-8 text-yellow-400" />}
                       </div>
                     ))}
                   </div>
