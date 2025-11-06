@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, User, LogOut, Lock, Crown } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const CORRECT_PASSWORD = 'CebicheBienDeli123';
-const STORAGE_KEY = 'leaderboard-entries';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -23,35 +23,19 @@ export default function App() {
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
-      // Intenta usar window.storage si está disponible
-      if (window.storage && typeof window.storage.get === 'function') {
-        try {
-          const result = await window.storage.get(STORAGE_KEY, true);
-          if (result) {
-            const data = JSON.parse(result.value);
-            setLeaderboard(data.sort((a, b) => a.timestamp - b.timestamp));
-          }
-        } catch (err) {
-          console.log('No data in window.storage, checking localStorage');
-          loadFromLocalStorage();
-        }
-      } else {
-        // Usa localStorage como fallback
-        loadFromLocalStorage();
-      }
+      const { data, error } = await supabase
+        .from('Registros')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setLeaderboard(data || []);
     } catch (error) {
-      console.log('Error loading leaderboard:', error);
+      console.error('Error loading leaderboard:', error);
       setLeaderboard([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadFromLocalStorage = () => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const data = JSON.parse(stored);
-      setLeaderboard(data.sort((a, b) => a.timestamp - b.timestamp));
     }
   };
 
@@ -75,6 +59,7 @@ export default function App() {
       return;
     }
 
+    // Verificar si el nombre ya existe
     const existingUser = leaderboard.find(
       entry => entry.name.toLowerCase() === userName.trim().toLowerCase()
     );
@@ -85,28 +70,17 @@ export default function App() {
     }
 
     try {
-      const newEntry = {
-        name: userName.trim(),
-        timestamp: Date.now()
-      };
+      const { data, error } = await supabase
+        .from('Registros')
+        .insert([
+          { name: userName.trim() }
+        ])
+        .select();
 
-      const updatedLeaderboard = [...leaderboard, newEntry];
-      
-      // Intenta usar window.storage si está disponible
-      if (window.storage && typeof window.storage.set === 'function') {
-        try {
-          await window.storage.set(STORAGE_KEY, JSON.stringify(updatedLeaderboard), true);
-        } catch (err) {
-          console.log('window.storage not available, using localStorage');
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLeaderboard));
-        }
-      } else {
-        // Usa localStorage como fallback
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedLeaderboard));
-      }
-      
-      // Reordenar para mostrar del más antiguo al más reciente
-      setLeaderboard(updatedLeaderboard.sort((a, b) => a.timestamp - b.timestamp));
+      if (error) throw error;
+
+      // Agregar el nuevo registro al leaderboard
+      setLeaderboard([...leaderboard, data[0]]);
       setUserName('');
       setHasRegistered(true);
       
@@ -129,10 +103,8 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black flex items-center justify-center p-4">
         <div className="bg-gray-800 bg-opacity-50 backdrop-blur-xl rounded-3xl shadow-2xl p-10 w-full max-w-md border border-purple-500 border-opacity-30">
           <div className="flex flex-col items-center mb-10">
-            <div className="w-40 h-40 bg-gradient-to-br from-purple-600 to-purple-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl">
-              <div className="text-5xl font-bold text-purple-100">
-                <img src="logocsi.jpg" alt="Logo" className="w-full h-full object-contain" />
-              </div>
+            <div className="w-40 h-40 rounded-3xl flex items-center justify-center mb-6">
+              <img src="logocsi.jpg" alt="Logo" className="w-full h-full object-contain p-4" />
             </div>
             <h1 className="text-4xl font-bold text-purple-100 mb-3">Bienvenido</h1>
             <p className="text-purple-300 text-center text-lg">Ingresa la contraseña para continuar</p>
@@ -181,7 +153,7 @@ export default function App() {
           <div style={{ background: 'linear-gradient(135deg, #7145d6 0%, #5a35ad 100%)' }} className="p-8 text-white shadow-lg">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-purple-800 bg-opacity-40 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <div className="w-20 h-20 bg-purple-800 bg-opacity-40 rounded-2xl flex items-center justify-center backdrop-blur-sm p-2">
                   <img src="logocsi.png" alt="Logo" className="w-full h-full object-contain" />
                 </div>
                 <div>
@@ -276,7 +248,7 @@ export default function App() {
                   <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                     {leaderboard.map((entry, index) => (
                       <div
-                        key={entry.timestamp}
+                        key={entry.id}
                         className="flex items-center justify-between p-5 rounded-xl transition-all bg-gradient-to-r from-gray-900 to-purple-900 bg-opacity-60 border-2 border-purple-500 border-opacity-30 hover:border-opacity-50 hover:shadow-lg"
                       >
                         <div className="flex items-center gap-4">
@@ -289,7 +261,7 @@ export default function App() {
                           <div>
                             <p className="font-bold text-purple-100 text-lg">{entry.name}</p>
                             <p className="text-sm text-purple-400">
-                              {new Date(entry.timestamp).toLocaleDateString('es-MX', {
+                              {new Date(entry.created_at).toLocaleDateString('es-MX', {
                                 day: '2-digit',
                                 month: 'short',
                                 year: 'numeric',
