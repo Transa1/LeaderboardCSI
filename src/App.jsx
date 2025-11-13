@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, User, LogOut, Lock, Crown } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-const CORRECT_PASSWORD = 'CebicheBienDeli123';
+const CORRECT_PASSWORD = 'Open the pod bay doors, Hal';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
